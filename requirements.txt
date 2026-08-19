@@ -1,0 +1,17 @@
+# Sign Language -> Speech Translator (laptop build)
+# Python 3.14. TensorFlow has no 3.14 wheels, so we use PyTorch.
+
+# Core ML / vision
+torch>=2.13
+mediapipe>=1.0.0
+opencv-python>=4.9
+numpy>=2.0
+scikit-learn>=1.5
+
+# Gloss -> sentence (OpenRouter, OpenAI-compatible) + TTS
+httpx>=0.27
+pyttsx3>=2.90
+
+# Backend / dashboard
+fastapi>=0.110
+uvicorn[standard]>=0.29

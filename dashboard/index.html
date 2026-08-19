@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Sign Language Translator</title>
+<style>
+  :root {
+    --bg: #0f1220; --panel: #1a1f36; --ink: #e8ecff; --muted: #8a93b8;
+    --accent: #4f8cff; --good: #37d67a; --warn: #ffb020;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, Segoe UI, Roboto, sans-serif;
+         background: var(--bg); color: var(--ink); }
+  header { padding: 16px 24px; border-bottom: 1px solid #262c4a; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .wrap { display: grid; grid-template-columns: minmax(0,2fr) minmax(280px,1fr);
+          gap: 16px; padding: 16px 24px; align-items: start; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid #262c4a; border-radius: 12px;
+           padding: 14px; }
+  .feed { position: relative; }
+  .feed img { width: 100%; border-radius: 8px; display: block; background: #000; }
+  .status { position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,.55);
+            padding: 6px 10px; border-radius: 8px; font-size: 14px; }
+  .conf { color: var(--good); }
+  .label { color: var(--muted); font-size: 12px; text-transform: uppercase;
+           letter-spacing: .05em; margin-bottom: 8px; }
+  .gloss { min-height: 42px; display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { background: #232a4d; padding: 6px 12px; border-radius: 999px; font-weight: 600; }
+  .chip.new { background: var(--accent); animation: pop .4s ease; }
+  @keyframes pop { from { transform: scale(1.3); } to { transform: scale(1); } }
+  .vocab .chip { background: #202544; color: var(--muted); font-weight: 500; }
+  .btns { display: flex; gap: 10px; margin-top: 12px; }
+  button { flex: 1; padding: 10px; border: 0; border-radius: 8px; font-weight: 600;
+           cursor: pointer; font-size: 14px; }
+  .primary { background: var(--accent); color: #fff; }
+  .ghost { background: #2a3157; color: var(--ink); }
+  .log { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+  .entry { border-left: 3px solid var(--accent); padding: 8px 12px; background: #171c33;
+           border-radius: 0 8px 8px 0; }
+  .entry .s { font-size: 15px; }
+  .entry .g { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .entry .meta { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+         background: var(--warn); margin-right: 6px; }
+  .dot.on { background: var(--good); }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+  .empty { color: var(--muted); font-size: 13px; font-style: italic; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Real-Time Sign Language → Speech Translator</h1>
+    <div class="sub"><span id="dot" class="dot"></span><span id="conn">connecting…</span></div>
+  </header>
+
+  <div class="wrap">
+    <div class="panel feed">
+      <img id="video" src="/video" alt="live feed" />
+      <div class="status">
+        <span id="top">—</span> <span class="conf" id="topconf"></span>
+      </div>
+      <div class="status" id="palm" style="left:auto; right:10px; background:var(--good); display:none;">
+        ✋ <span id="palmtxt">hold to finish…</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="label">Current gloss</div>
+        <div class="gloss" id="gloss"></div>
+        <div class="hint">✋ Show an open palm to finish the sentence (or press the button).</div>
+        <div class="btns">
+          <button class="primary" id="finalize">Finalize sentence</button>
+          <button class="ghost" id="clear">Clear</button>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-top:16px;">
+        <div class="label">Sentence history</div>
+        <div class="log" id="log"><div class="empty" id="empty">No sentences yet — sign, then show your palm to finish.</div></div>
+      </div>
+
+      <div class="panel vocab" style="margin-top:16px;">
+        <div class="label">Vocabulary</div>
+        <div class="gloss" id="vocab"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let palmHold = 3;
+
+function renderGloss(words) {
+  $("gloss").innerHTML = "";
+  (words || []).forEach(w => {
+    const c = document.createElement("span");
+    c.className = "chip"; c.textContent = w;
+    $("gloss").appendChild(c);
+  });
+}
+
+function addSentence(e) {
+  const empty = $("empty");
+  if (empty) empty.remove();
+  const div = document.createElement("div");
+  div.className = "entry";
+  div.innerHTML = `<div class="s">${e.sentence || "—"}</div>
+    <div class="g">${(e.gloss || []).join(" · ")}</div>
+    <div class="meta">${e.ts || ""} · ${e.source || ""}</div>`;
+  $("log").prepend(div);
+}
+
+function connect() {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  const ws = new WebSocket(`${proto}://${location.host}/ws`);
+
+  ws.onopen = () => { $("conn").textContent = "connected"; $("dot").classList.add("on"); };
+  ws.onclose = () => {
+    $("conn").textContent = "disconnected — retrying"; $("dot").classList.remove("on");
+    setTimeout(connect, 1500);
+  };
+  ws.onmessage = (m) => {
+    const e = JSON.parse(m.data);
+    if (e.type === "hello") {
+      if (e.palm_hold_seconds) palmHold = e.palm_hold_seconds;
+      (e.vocab || []).forEach(w => {
+        const c = document.createElement("span");
+        c.className = "chip"; c.textContent = w; $("vocab").appendChild(c);
+      });
+      (e.history || []).forEach(addSentence);
+    } else if (e.type === "state") {
+      $("top").textContent = e.top_word || "—";
+      $("topconf").textContent = e.top_word ? e.top_conf : "";
+      $("palm").style.display = e.palm_active ? "block" : "none";
+      if (e.palm_active) {
+        const remain = Math.max(0, Math.ceil(palmHold * (1 - (e.palm_progress || 0))));
+        $("palmtxt").textContent = remain > 0 ? `hold to finish… ${remain}` : "finishing…";
+      }
+      renderGloss(e.gloss);
+    } else if (e.type === "sentence") {
+      $("palm").style.display = "none";
+      renderGloss([]);
+      addSentence(e);
+    } else if (e.type === "error") {
+      $("conn").textContent = "error: " + e.message;
+    }
+  };
+}
+
+$("finalize").onclick = () => fetch("/finalize", { method: "POST" });
+$("clear").onclick = () => renderGloss([]);
+connect();
+</script>
+</body>
+</html>

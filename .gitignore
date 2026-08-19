@@ -1,0 +1,14 @@
+# data & models (large / regenerated)
+data/raw/
+data/processed/
+model/saved_model/
+models/*.task
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# env
+.env
