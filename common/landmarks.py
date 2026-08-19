@@ -121,11 +121,21 @@ def _draw_hand(frame_bgr: np.ndarray, hand_lms, color) -> None:
         cv2.circle(frame_bgr, p, 3, (255, 255, 255), -1)
 
 
-def open_camera(index: int = config.CAMERA_INDEX) -> cv2.VideoCapture:
-    """Open the webcam, preferring the DirectShow backend on Windows for speed."""
-    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
-    if not cap.isOpened():
-        cap = cv2.VideoCapture(index)
+def open_camera(source=None) -> cv2.VideoCapture:
+    """Open the camera source.
+
+    `source` (or config.CAMERA_SOURCE) may be a webcam index (int / digit string)
+    or an ESP32-CAM MJPEG stream URL, e.g. "http://172.20.10.2:81/stream".
+    """
+    src = config.CAMERA_SOURCE if source is None else source
+    if isinstance(src, str) and src.isdigit():
+        src = int(src)
+    if isinstance(src, int):
+        cap = cv2.VideoCapture(src, cv2.CAP_DSHOW)   # local webcam (Windows)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(src)
+    else:
+        cap = cv2.VideoCapture(src)                  # network stream (ESP32-CAM)
     return cap
 
 

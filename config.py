@@ -87,6 +87,10 @@ SAMPLES_PER_WORD = 30       # target recorded clips per word
 COUNTDOWN_SECONDS = 2       # get-ready countdown before each clip
 CAMERA_INDEX = 0
 
+# Camera source: a webcam index (0, 1, ...) OR an ESP32-CAM MJPEG stream URL,
+# e.g. "http://172.20.10.2:81/stream". Override with the CAMERA_SOURCE env var.
+CAMERA_SOURCE = os.environ.get("CAMERA_SOURCE", str(CAMERA_INDEX))
+
 # --------------------------------------------------------------------------- #
 # MediaPipe
 # --------------------------------------------------------------------------- #
